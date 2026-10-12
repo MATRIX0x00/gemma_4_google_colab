@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "MatrixCode MCP Browser Bridge",
+  "version": "1.0.1",
+  "description": "MCP Chrome Extension allowing MatrixCode CLI terminal agent to autonomously control the browser for CTFs and web tasks.",
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "scripting",
+    "cookies",
+    "storage",
+    "alarms"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "MatrixCode MCP Browser Bridge"
+  }
+}

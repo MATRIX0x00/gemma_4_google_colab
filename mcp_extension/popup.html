@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>MatrixCode MCP Bridge</title>
+  <style>
+    body {
+      width: 320px;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      margin: 0;
+      padding: 14px;
+      background: #18181b;
+      color: #fafafa;
+    }
+    h1 {
+      font-size: 15px;
+      margin: 0 0 10px 0;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .connected {
+      background: #064e3b;
+      color: #34d399;
+      border: 1px solid #059669;
+    }
+    .disconnected {
+      background: #450a0a;
+      color: #f87171;
+      border: 1px solid #dc2626;
+    }
+    .info-card {
+      background: #27272a;
+      border-radius: 8px;
+      padding: 10px;
+      margin-top: 10px;
+      font-size: 12px;
+      border: 1px solid #3f3f46;
+    }
+    .info-row {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .info-row:last-child {
+      margin-bottom: 0;
+    }
+    .label {
+      color: #a1a1aa;
+    }
+    .val {
+      font-weight: 500;
+      max-width: 190px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    button {
+      margin-top: 12px;
+      width: 100%;
+      background: #2563eb;
+      color: white;
+      border: none;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    button:hover {
+      background: #1d4ed8;
+    }
+    .footer {
+      margin-top: 10px;
+      font-size: 11px;
+      color: #71717a;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <h1>
+    <span>MatrixCode MCP</span>
+    <span id="statusBadge" class="status-badge disconnected">Disconnected</span>
+  </h1>
+  <div class="info-card">
+    <div class="info-row">
+      <span class="label">Bridge Host:</span>
+      <span class="val">ws://127.0.0.1:8765</span>
+    </div>
+    <div class="info-row">
+      <span class="label">Active Tab:</span>
+      <span id="activeTabTitle" class="val">-</span>
+    </div>
+    <div class="info-row">
+      <span class="label">URL:</span>
+      <span id="activeTabUrl" class="val">-</span>
+    </div>
+  </div>
+  <button id="reconnectBtn">Reconnect to Terminal</button>
+  <div class="footer">MatrixCode Terminal Browser Agent Bridge</div>
+  <script src="popup.js"></script>
+</body>
+</html>

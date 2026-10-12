@@ -1,0 +1,2060 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>OpenCode Web Studio - Gemma GGUF & Autonomous Agent</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+  <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/marked.min.js"></script>
+  <style>
+    :root {
+      --bg-darker: #080a0f;
+      --bg-dark: #0e121a;
+      --bg-surface: #151a24;
+      --bg-surface-hover: #1c2331;
+      --border-color: #242c3d;
+      --accent-blue: #38bdf8;
+      --accent-green: #22c55e;
+      --accent-amber: #f59e0b;
+      --accent-red: #ef4444;
+      --accent-purple: #a855f7;
+      --text-main: #f1f5f9;
+      --text-muted: #94a3b8;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+    body {
+      background: var(--bg-darker);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+    
+    /* Header */
+    header {
+      background: var(--bg-dark);
+      padding: 10px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      flex-shrink: 0;
+      z-index: 20;
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--accent-blue);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      letter-spacing: -0.3px;
+    }
+    .brand-badge {
+      font-size: 0.68rem;
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      padding: 2px 7px;
+      border-radius: 9999px;
+      font-weight: 600;
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .connection-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--accent-red);
+      display: inline-block;
+      transition: background 0.3s ease;
+    }
+    .connection-dot.connected {
+      background: var(--accent-green);
+      box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+    }
+    .config-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .input-pill {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      width: 280px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .input-pill:focus { border-color: var(--accent-blue); }
+    .btn-pill {
+      background: #0284c7;
+      color: #fff;
+      border: none;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: background 0.2s, transform 0.1s;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .btn-pill:hover { background: #0369a1; }
+    .btn-secondary {
+      background: var(--bg-surface);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+    }
+    .btn-secondary:hover { background: var(--bg-surface-hover); }
+    .btn-icon {
+      background: var(--bg-surface);
+      color: var(--text-main);
+      border: 1px solid var(--border-color);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-size: 0.88rem;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s;
+    }
+    .btn-icon:hover {
+      background: var(--bg-surface-hover);
+      border-color: var(--accent-blue);
+      color: var(--accent-blue);
+    }
+
+    /* Main Layout */
+    .container { display: flex; flex: 1; min-height: 0; overflow: hidden; position: relative; }
+    
+    /* Sidebar (Left Box) with smooth collapse */
+    .sidebar {
+      width: 270px;
+      background: var(--bg-dark);
+      border-right: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      flex-shrink: 0;
+      transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s ease;
+      position: relative;
+    }
+    .sidebar.collapsed {
+      width: 0 !important;
+      min-width: 0 !important;
+      border-right: none;
+      opacity: 0;
+      pointer-events: none;
+    }
+    .sidebar-header {
+      padding: 10px 14px;
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      font-weight: 700;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    .sidebar-actions {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .sidebar-search-box {
+      padding: 8px 10px;
+      border-bottom: 1px solid var(--border-color);
+      background: var(--bg-surface);
+      flex-shrink: 0;
+    }
+    .sidebar-search-box input {
+      width: 100%;
+      background: var(--bg-dark);
+      border: 1px solid var(--border-color);
+      color: #fff;
+      font-size: 0.78rem;
+      padding: 5px 8px;
+      border-radius: 4px;
+      outline: none;
+    }
+    .sidebar-search-box input:focus {
+      border-color: var(--accent-blue);
+    }
+    .file-tree-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px;
+    }
+    .file-tree {
+      list-style: none;
+    }
+    .file-item {
+      padding: 6px 8px;
+      font-size: 0.82rem;
+      border-radius: 5px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: #cbd5e1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      transition: background 0.15s;
+      margin-bottom: 2px;
+    }
+    .file-item:hover {
+      background: var(--bg-surface);
+      color: #fff;
+    }
+    .file-item.active-file {
+      background: var(--bg-surface-hover);
+      color: var(--accent-blue);
+      border-left: 2px solid var(--accent-blue);
+    }
+    .file-item-name {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .file-delete-icon {
+      opacity: 0;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      padding: 2px 4px;
+      border-radius: 3px;
+      transition: all 0.15s ease;
+    }
+    .file-item:hover .file-delete-icon {
+      opacity: 1;
+    }
+    .file-delete-icon:hover {
+      color: var(--accent-red);
+      background: rgba(239, 68, 68, 0.15);
+    }
+
+    /* Floating Toggle Button when sidebar is collapsed */
+    .sidebar-expand-pill {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      z-index: 30;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      color: var(--accent-blue);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      display: none;
+      align-items: center;
+      gap: 6px;
+    }
+    .sidebar-expand-pill:hover {
+      background: var(--bg-surface-hover);
+      border-color: var(--accent-blue);
+    }
+
+    /* Workspace Tabs */
+    .main-workspace { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
+    .tabs {
+      display: flex;
+      background: var(--bg-dark);
+      border-bottom: 1px solid var(--border-color);
+      gap: 4px;
+      padding: 0 8px;
+      flex-shrink: 0;
+    }
+    .tab {
+      padding: 9px 16px;
+      font-size: 0.84rem;
+      cursor: pointer;
+      color: var(--text-muted);
+      border-bottom: 2px solid transparent;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: 500;
+      user-select: none;
+    }
+    .tab:hover { color: #fff; }
+    .tab.active {
+      color: var(--accent-blue);
+      border-bottom: 2px solid var(--accent-blue);
+      background: var(--bg-surface);
+      font-weight: 600;
+      border-top-left-radius: 6px;
+      border-top-right-radius: 6px;
+    }
+    .tab-content {
+      flex: 1;
+      min-height: 0;
+      display: none;
+      position: relative;
+      overflow: hidden;
+    }
+    .tab-content.active {
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Terminal & Editor Tab Styles */
+    #terminal-container { flex: 1; min-height: 0; background: #07090e; padding: 8px; overflow: hidden; }
+    #editor-container { flex: 1; min-height: 0; display: flex; flex-direction: column; background: #090c12; }
+    .editor-toolbar {
+      padding: 8px 14px;
+      background: var(--bg-surface);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.82rem;
+      flex-shrink: 0;
+    }
+    .editor-status-bar {
+      padding: 4px 14px;
+      background: var(--bg-dark);
+      border-top: 1px solid var(--border-color);
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-shrink: 0;
+    }
+    #code-editor {
+      flex: 1;
+      min-height: 0;
+      background: #090c12;
+      color: #e2e8f0;
+      border: none;
+      padding: 14px;
+      font-family: 'Cascadia Code', Consolas, 'Courier New', monospace;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      resize: none;
+      outline: none;
+    }
+
+    /* Full Interactive Agent Layout */
+    .agent-layout {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      background: var(--bg-darker);
+      position: relative;
+    }
+    .agent-header-bar {
+      background: var(--bg-surface);
+      padding: 8px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid var(--border-color);
+      font-size: 0.82rem;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .agent-status-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.75rem;
+      padding: 3px 10px;
+      border-radius: 9999px;
+      background: #1e293b;
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .agent-status-tag.running {
+      background: rgba(34, 197, 94, 0.15);
+      color: var(--accent-green);
+      border: 1px solid rgba(34, 197, 94, 0.3);
+    }
+    .agent-status-tag.thinking {
+      background: rgba(56, 189, 248, 0.15);
+      color: var(--accent-blue);
+      border: 1px solid rgba(56, 189, 248, 0.3);
+    }
+    .agent-status-tag.executing {
+      background: rgba(245, 158, 11, 0.15);
+      color: var(--accent-amber);
+      border: 1px solid rgba(245, 158, 11, 0.3);
+    }
+
+    /* Natural Chat Scroll Area */
+    .chat-scroll-container {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 20px 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      scroll-behavior: smooth;
+    }
+    .chat-scroll-container::-webkit-scrollbar {
+      width: 10px;
+    }
+    .chat-scroll-container::-webkit-scrollbar-track {
+      background: rgba(14, 18, 26, 0.5);
+    }
+    .chat-scroll-container::-webkit-scrollbar-thumb {
+      background: #273043;
+      border-radius: 5px;
+      border: 2px solid var(--bg-darker);
+    }
+    .chat-scroll-container::-webkit-scrollbar-thumb:hover {
+      background: #38455e;
+    }
+
+    /* Unified Message Cards */
+    .msg-card {
+      display: flex;
+      flex-direction: column;
+      max-width: 960px;
+      width: 100%;
+      margin: 0 auto;
+      flex-shrink: 0;
+      min-height: fit-content;
+      animation: fadeIn 0.15s ease-out;
+    }
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* User Goals / Directives */
+    .msg-user {
+      align-self: flex-end;
+      background: linear-gradient(135deg, #0284c7, #0369a1);
+      color: #ffffff;
+      padding: 12px 18px;
+      border-radius: 12px 12px 2px 12px;
+      font-size: 0.9rem;
+      line-height: 1.5;
+      box-shadow: 0 4px 14px rgba(2, 132, 199, 0.25);
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+
+    .msg-user-steer {
+      align-self: flex-end;
+      background: linear-gradient(135deg, #7c3aed, #6d28d9);
+      color: #ffffff;
+      padding: 10px 16px;
+      border-radius: 12px 12px 2px 12px;
+      font-size: 0.85rem;
+      line-height: 1.45;
+      box-shadow: 0 4px 14px rgba(124, 58, 237, 0.25);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* Agent Thought / Reasoning Card */
+    .msg-thought {
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+    }
+    .thought-header {
+      padding: 10px 16px;
+      background: rgba(255, 255, 255, 0.02);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: var(--accent-blue);
+      user-select: none;
+      border-bottom: 1px solid var(--border-color);
+    }
+    .thought-header:hover {
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .thought-body {
+      padding: 16px;
+      font-size: 0.88rem;
+      line-height: 1.6;
+      color: #cbd5e1;
+      white-space: pre-wrap;
+      word-break: break-word;
+      font-family: inherit;
+    }
+
+    /* Markdown Content & Enhanced Block Boxes */
+    .markdown-content {
+      line-height: 1.6;
+      color: #cbd5e1;
+    }
+    .markdown-content p {
+      margin-bottom: 8px;
+    }
+    .markdown-content p:last-child {
+      margin-bottom: 0;
+    }
+    .markdown-content strong {
+      color: #f1f5f9;
+      font-weight: 600;
+    }
+    .markdown-content ul, .markdown-content ol {
+      margin-left: 20px;
+      margin-bottom: 10px;
+    }
+    .markdown-content li {
+      margin-bottom: 4px;
+    }
+    .inline-code {
+      background: #1e293b;
+      color: var(--accent-blue);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: 'Cascadia Code', Consolas, monospace;
+      font-size: 0.84em;
+      border: 1px solid #334155;
+    }
+    .code-block-box {
+      background: #090d14;
+      border: 1px solid #283347;
+      border-radius: 8px;
+      margin: 10px 0;
+      overflow: hidden;
+      font-family: 'Cascadia Code', Consolas, monospace;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+    }
+    .code-block-header {
+      background: #131924;
+      padding: 6px 12px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid #283347;
+    }
+    .code-block-lang {
+      color: var(--accent-amber);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+    .code-copy-btn {
+      background: #1e293b;
+      border: 1px solid #334155;
+      color: #cbd5e1;
+      font-size: 0.72rem;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .code-copy-btn:hover {
+      background: var(--accent-blue);
+      color: #07090e;
+      border-color: var(--accent-blue);
+    }
+    .code-block-body {
+      padding: 12px 14px;
+      margin: 0;
+      color: #e2e8f0;
+      font-size: 0.84rem;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      line-height: 1.45;
+    }
+
+    /* Action Tool Card */
+    .msg-tool {
+      background: #0d1118;
+      border: 1px solid #283347;
+      border-radius: 8px;
+      overflow: hidden;
+      font-family: 'Cascadia Code', Consolas, monospace;
+      font-size: 0.82rem;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+    }
+    .tool-header {
+      background: #141a26;
+      padding: 9px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #283347;
+      font-weight: 600;
+      color: var(--accent-amber);
+    }
+    .tool-body {
+      padding: 12px 16px;
+      background: #090c12;
+      color: #e2e8f0;
+      white-space: pre-wrap;
+      word-break: break-word;
+      border-bottom: 1px solid #1e2636;
+      font-family: 'Cascadia Code', Consolas, monospace;
+      font-size: 0.85rem;
+    }
+    .tool-result {
+      background: #06090e;
+      padding: 14px 16px;
+      color: #94a3b8;
+      white-space: pre-wrap;
+      word-break: break-word;
+      line-height: 1.5;
+      font-family: 'Cascadia Code', Consolas, monospace;
+      font-size: 0.84rem;
+      border-top: 1px solid #1a2333;
+      max-height: 500px;
+      overflow-y: auto;
+    }
+    .tool-result.success {
+      border-left: 3px solid var(--accent-green);
+      color: #bbf7d0;
+      background: #061814;
+    }
+    .tool-result.error {
+      border-left: 3px solid var(--accent-red);
+      color: #fecaca;
+      background: #19090b;
+    }
+
+    /* Jump to Bottom Floating Action */
+    .scroll-bottom-btn {
+      position: absolute;
+      bottom: 110px;
+      right: 32px;
+      background: var(--bg-surface);
+      border: 1px solid var(--border-color);
+      color: var(--accent-blue);
+      padding: 8px 14px;
+      border-radius: 9999px;
+      font-size: 0.8rem;
+      cursor: pointer;
+      display: none;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.45);
+      font-weight: 600;
+      z-index: 15;
+      transition: transform 0.15s ease;
+    }
+    .scroll-bottom-btn:hover {
+      background: var(--bg-surface-hover);
+      transform: translateY(-2px);
+    }
+
+    /* Bottom Interactive Input Dock */
+    .agent-input-container {
+      background: var(--bg-surface);
+      padding: 12px 20px 16px 20px;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+    .dock-wrapper {
+      max-width: 960px;
+      width: 100%;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .prompt-suggestions {
+      display: flex;
+      gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+      scrollbar-width: none;
+    }
+    .prompt-suggestions::-webkit-scrollbar { display: none; }
+    .prompt-chip {
+      background: var(--bg-dark);
+      border: 1px solid var(--border-color);
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      padding: 4px 11px;
+      border-radius: 9999px;
+      white-space: nowrap;
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .prompt-chip:hover {
+      color: #fff;
+      border-color: var(--accent-blue);
+      background: var(--bg-surface-hover);
+    }
+    .input-row {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    .input-textarea {
+      flex: 1;
+      background: var(--bg-dark);
+      border: 1px solid var(--border-color);
+      color: #fff;
+      padding: 11px 16px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      outline: none;
+      resize: none;
+      min-height: 50px;
+      max-height: 140px;
+      line-height: 1.45;
+      transition: border-color 0.2s;
+    }
+    .input-textarea:focus { border-color: var(--accent-blue); }
+    .btn-send {
+      background: var(--accent-blue);
+      color: #07090e;
+      border: none;
+      padding: 12px 20px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .btn-send:hover { opacity: 0.9; }
+    .btn-steer {
+      background: var(--accent-purple);
+      color: #fff;
+      border: none;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: none;
+      align-items: center;
+      gap: 6px;
+      white-space: nowrap;
+    }
+    .btn-steer:hover { opacity: 0.9; }
+    .btn-stop {
+      background: var(--accent-red);
+      color: #fff;
+      border: none;
+      padding: 12px 18px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      display: none;
+      white-space: nowrap;
+    }
+    .btn-stop:hover { opacity: 0.9; }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-left">
+      <!-- Toggle Sidebar Left Box Button -->
+      <button class="btn-icon" id="sidebarToggleBtn" onclick="toggleSidebar()" title="Toggle Explorer (Ctrl+B)">
+        <span id="sidebarToggleIcon">☰</span>
+      </button>
+      <div class="brand">
+        <span class="connection-dot" id="connectionStatusDot" title="WebSocket Disconnected"></span>
+        <span>⚡ OpenCode Web Studio</span>
+        <span class="brand-badge">v1.2 Agent Engine</span>
+      </div>
+      <div id="browserBridgeBadge" style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem; padding: 2px 8px; border-radius: 9999px; background: rgba(239, 68, 68, 0.15); color: var(--accent-red); border: 1px solid rgba(239, 68, 68, 0.3); font-weight: 600; cursor: pointer;" onclick="checkBrowserBridgeStatus()" title="Click to refresh MCP Browser Bridge">
+        <span style="width:6px; height:6px; border-radius:50%; background:currentColor;"></span>
+        <span id="browserBridgeText">MCP: Disconnected</span>
+      </div>
+    </div>
+    <div class="config-bar">
+      <input type="text" class="input-pill" id="ngrokUrlInput" placeholder="GGUF ngrok URL (https://xxxx.ngrok-free.app)" value="{{ config.ngrok_url }}" />
+      <button class="btn-pill" onclick="updateConfig()">Save Endpoint</button>
+      <button class="btn-pill btn-secondary" onclick="testConnection()" title="Test model health endpoint">Ping Test</button>
+      <button class="btn-pill btn-secondary" onclick="openSettingsModal()" title="System Instruction & Approval Settings">⚙️ Settings</button>
+    </div>
+  </header>
+
+  <!-- SETTINGS MODAL -->
+  <div id="settingsModal" onclick="if(event.target === this) closeSettingsModal()" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.7); z-index:100; align-items:center; justify-content:center;">
+    <div style="background:var(--bg-surface); border:1px solid var(--border-color); border-radius:10px; width:90%; max-width:650px; padding:20px; display:flex; flex-direction:column; gap:16px; box-shadow:0 8px 30px rgba(0,0,0,0.5);">
+      <div style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
+        <h3 style="margin:0; font-size:1.1rem; color:var(--accent-blue);">⚙️ Agent Mind & Process Settings</h3>
+        <button class="btn-icon" onclick="closeSettingsModal()" style="font-size:1rem;">✕</button>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:6px;">
+        <label style="font-size:0.85rem; font-weight:600; color:#f1f5f9;">🧠 Custom Core System Instruction (AI Mind):</label>
+        <span style="font-size:0.75rem; color:var(--text-muted);">This core instruction will govern the agent's behavior, personality, thinking, rules, and decision-making for all tasks.</span>
+        <textarea id="settingsSystemInstruction" style="width:100%; height:140px; background:var(--bg-dark); border:1px solid var(--border-color); border-radius:6px; color:#fff; padding:10px; font-family:'Cascadia Code', Consolas, monospace; font-size:0.85rem; resize:vertical; outline:none;">{{ config.system_instruction }}</textarea>
+      </div>
+      <div style="display:flex; gap:16px; align-items:center;">
+        <div style="display:flex; flex-direction:column; gap:4px;">
+          <label for="settingsMaxIterations" style="font-size:0.85rem; font-weight:600; color:#f1f5f9;">Max Steps Per Task (Continuous Execution Limit):</label>
+          <input type="number" id="settingsMaxIterations" min="1" max="200" value="{{ config.max_iterations }}" style="background:var(--bg-dark); border:1px solid var(--border-color); color:#fff; padding:6px 10px; border-radius:6px; font-size:0.85rem; outline:none; width:100px;" />
+        </div>
+      </div>
+      <div style="background:var(--bg-dark); border:1px solid var(--border-color); border-radius:8px; padding:12px; display:flex; align-items:flex-start; gap:12px;">
+        <input type="checkbox" id="settingsAutoApprove" style="margin-top:3px; transform:scale(1.2); cursor:pointer;" {% if config.auto_approve %}checked{% endif %} />
+        <div style="display:flex; flex-direction:column; gap:2px;">
+          <label for="settingsAutoApprove" style="font-size:0.85rem; font-weight:600; cursor:pointer;">⚡ Auto-Approve Commands & Actions</label>
+          <span style="font-size:0.75rem; color:var(--text-muted);">When unchecked, the agent will pause before executing each command, file edit, or browser action and require you to review and manually accept or reject it.</span>
+        </div>
+      </div>
+      <div style="display:flex; justify-content:flex-end; gap:10px; border-top:1px solid var(--border-color); padding-top:10px;">
+        <button class="btn-pill btn-secondary" onclick="closeSettingsModal()">Cancel</button>
+        <button class="btn-pill" onclick="saveSettings()">Save & Apply Mind Settings</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <!-- Floating button to expand left box if hidden -->
+    <button class="sidebar-expand-pill" id="sidebarFloatingExpandBtn" onclick="toggleSidebar()">
+      <span>📂 Show Explorer</span>
+    </button>
+
+    <!-- Sidebar Explorer (Left Box) -->
+    <div class="sidebar" id="leftSidebar">
+      <div class="sidebar-header">
+        <span>Workspace Explorer</span>
+        <div class="sidebar-actions">
+          <button class="btn-icon" style="padding: 2px 6px; font-size: 0.72rem;" onclick="createNewFilePrompt()" title="New File">+ New</button>
+          <button class="btn-icon" style="padding: 2px 6px; font-size: 0.72rem;" onclick="loadFiles()" title="Refresh Files">↻</button>
+          <button class="btn-icon" style="padding: 2px 6px; font-size: 0.72rem;" onclick="toggleSidebar()" title="Hide Left Box (Ctrl+B)">✕</button>
+        </div>
+      </div>
+      
+      <!-- Quick File Filter -->
+      <div class="sidebar-search-box">
+        <input type="text" id="fileFilterInput" placeholder="Search workspace files..." oninput="filterFiles()" />
+      </div>
+
+      <div class="file-tree-container">
+        <ul class="file-tree" id="fileTree"></ul>
+      </div>
+    </div>
+
+    <!-- Main Workspace -->
+    <div class="main-workspace">
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('agent')">🤖 Autonomous Agent</div>
+        <div class="tab" onclick="switchTab('matrix')">⚡ Matrix Agent Advanced</div>
+        <div class="tab" onclick="switchTab('terminal')">💻 Web Terminal (xterm.js)</div>
+        <div class="tab" onclick="switchTab('editor')">📝 Code Editor</div>
+      </div>
+
+      <!-- AGENT TAB -->
+      <div id="tab-agent" class="tab-content active">
+        <div class="agent-layout">
+          <div class="agent-header-bar">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="agentStatusTag" class="agent-status-tag">● Idle</span>
+              <span id="agentStepIndicator" style="color: var(--text-muted); font-size: 0.8rem;">Ready for objectives</span>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <button class="btn-pill btn-secondary" style="padding: 4px 10px; font-size: 0.74rem;" onclick="exportChatTranscript()" title="Export session log">Export Log</button>
+              <button class="btn-pill btn-secondary" style="padding: 4px 10px; font-size: 0.74rem;" onclick="clearChat()">Clear Timeline</button>
+              <label style="display: flex; align-items: center; gap: 5px; font-size: 0.75rem; color: var(--text-muted); cursor: pointer;">
+                <input type="checkbox" id="autoScrollCheck" checked /> Lock Auto-scroll
+              </label>
+            </div>
+          </div>
+
+          <!-- Main Chat Scroll Container -->
+          <div class="chat-scroll-container" id="chatScrollContainer">
+            <div class="msg-card msg-thought">
+              <div class="thought-header" onclick="toggleThought(this)">
+                <span>✨ Autonomous Agent Engine Initialized</span>
+                <span>▾</span>
+              </div>
+              <div class="thought-body">Welcome to OpenCode Autonomous Studio. Give the agent any high-level objective (e.g. "audit web server endpoints", "run python tests and fix errors", "navigate browser MCP", or "inspect processes"). The agent autonomously plans, reasons, streams thoughts, and executes shell, file, or browser operations in live loops. You can also inject live steering directions at any time while the agent is running, and toggle the left Explorer box on/off using the button above or <strong>Ctrl+B</strong>!</div>
+            </div>
+          </div>
+
+          <button class="scroll-bottom-btn" id="scrollBottomBtn" onclick="scrollToBottom(true)">↓ Jump to newest message</button>
+
+          <!-- Interactive Input Dock -->
+          <div class="agent-input-container">
+            <div class="dock-wrapper">
+              <div class="prompt-suggestions">
+                <div class="prompt-chip" onclick="setPrompt('Check system resources, active python processes, and open ports')">🔍 Inspect System Ports</div>
+                <div class="prompt-chip" onclick="setPrompt('Create a simple HTTP test script and verify it with a curl command')">🚀 Create Test Script</div>
+                <div class="prompt-chip" onclick="setPrompt('Check git status and summarize recently modified files')">📂 Git Status Summary</div>
+                <div class="prompt-chip" onclick="setPrompt('Perform a quick security audit on local endpoints and headers')">🛡️ Security Audit</div>
+              </div>
+              <div class="input-row">
+                <textarea id="agentGoalInput" class="input-textarea" placeholder="Type task goal (Enter to run, Shift+Enter for newline)..." onkeydown="handleInputKey(event)" oninput="autoExpandTextarea(this)"></textarea>
+                <button class="btn-send" id="btnSend" onclick="sendAgentAction()">Execute Task</button>
+                <button class="btn-steer" id="btnSteer" onclick="sendSteeringGuidance()">Steer Agent 🧭</button>
+                <button class="btn-stop" id="btnStop" onclick="stopAgentTask()">Halt ⏹</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- MATRIX AGENT ADVANCED TAB -->
+      <div id="tab-matrix" class="tab-content">
+        <div class="matrix-workspace-container" style="display:flex; flex:1; min-height:0; height:100%; overflow:hidden; background:var(--bg-darker);">
+          <!-- Left Panel: Matrix Agent Chat & Autonomous Control -->
+          <div style="flex:1; display:flex; flex-direction:column; border-right:1px solid var(--border-color); min-width:280px; max-width:50%;">
+            <div style="padding:10px 16px; background:#0b0f17; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <span style="font-size:0.85rem; font-weight:700; color:var(--accent-green);">⚡ Matrix Agent Core</span>
+                <span id="matrixAgentBadge" style="font-size:0.7rem; padding:2px 7px; border-radius:9999px; background:rgba(34,197,94,0.15); color:var(--accent-green); border:1px solid rgba(34,197,94,0.3);">Ready</span>
+              </div>
+              <button class="btn-pill btn-secondary" style="padding:4px 10px; font-size:0.74rem;" onclick="clearMatrixChat()">Clear Chat</button>
+            </div>
+            <div id="matrixChatScroll" style="flex:1; overflow-y:auto; padding:16px; display:flex; flex-direction:column; gap:12px;">
+              <div class="msg-card msg-thought">
+                <div class="thought-header">
+                  <span>⚡ Matrix Advanced Orchestrator</span>
+                  <span>▾</span>
+                </div>
+                <div class="thought-body">
+                  Welcome to <strong>Matrix Agent Advanced</strong>. This agent can spin up, switch, and direct multiple Termux consoles in real time, execute multi-target exploitation, perform parallel tasks, and visually populate the dual <strong>HTTP Request</strong> and <strong>HTTP Response</strong> inspection engines below.
+                </div>
+              </div>
+            </div>
+            <div style="padding:12px; background:var(--bg-surface); border-top:1px solid var(--border-color); display:flex; flex-direction:column; gap:8px;">
+              <div style="display:flex; gap:8px;">
+                <textarea id="matrixGoalInput" class="input-textarea" style="min-height:48px; max-height:100px; font-size:0.86rem;" placeholder="Assign objective to Matrix Agent (e.g. 'Create 2 terminals: run curl tests and analyze endpoints')..." onkeydown="if(event.key==='Enter' && !event.shiftKey){ event.preventDefault(); sendMatrixAgentGoal(); }"></textarea>
+                <button class="btn-send" style="background:var(--accent-green);" onclick="sendMatrixAgentGoal()">Deploy</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Panel: Termux Multi-Terminal Matrix & Dual HTTP Inspector -->
+          <div style="flex:1; display:flex; flex-direction:column; min-width:320px; overflow:hidden;">
+            <!-- Top Section: Interactive CMD Terminal Matrix Deck -->
+            <div style="flex:1; min-height:45%; display:flex; flex-direction:column; border-bottom:1px solid var(--border-color); background:#06080d;">
+              <div style="display:flex; align-items:center; background:#0c1017; border-bottom:1px solid #1f2737; padding:6px 10px; justify-content:space-between;">
+                <div style="display:flex; align-items:center; gap:6px; overflow-x:auto;" id="matrixTermTabs">
+                  <!-- Dynamic CMD Tabs populated here -->
+                </div>
+                <div style="display:flex; gap:6px;">
+                  <button class="btn-pill" style="background:#0284c7; padding:4px 9px; font-size:0.75rem;" onclick="spawnNewMatrixTerm()">+ New Terminal (CMD)</button>
+                  <button class="btn-pill btn-secondary" style="padding:4px 8px; font-size:0.75rem;" onclick="closeActiveMatrixTerm()">✕ Close</button>
+                </div>
+              </div>
+              <div id="matrixTerminalContainer" style="flex:1; height:100%; min-height:0; background:#0a0a0a; padding:6px; overflow:hidden;"></div>
+            </div>
+
+            <!-- Bottom Section: Dual Request & Response Inspector Boxes with Live Test URL Bar -->
+            <div style="flex:1; min-height:45%; display:flex; flex-direction:column; background:var(--bg-dark);">
+              <div style="padding:6px 14px; background:#0e131d; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span style="font-size:0.78rem; font-weight:700; color:var(--accent-blue); text-transform:uppercase; letter-spacing:0.5px;">📡 Live HTTP Request & Response Inspector</span>
+                  <span id="matrixInspectorStatus" style="font-size:0.72rem; padding:1px 8px; border-radius:9999px; background:#1e293b; color:var(--accent-green); font-weight:600;">Awaiting traffic</span>
+                </div>
+                <div style="display:flex; gap:6px;">
+                  <button class="btn-pill btn-secondary" style="padding:2px 8px; font-size:0.72rem;" onclick="clearHttpInspector()">Clear Inspector</button>
+                </div>
+              </div>
+              <!-- Quick Request Runner Bar -->
+              <div style="padding:6px 10px; background:#121824; border-bottom:1px solid #1e2636; display:flex; gap:6px; align-items:center;">
+                <select id="manualHttpMethod" style="background:#080b11; border:1px solid #283347; color:#38bdf8; font-size:0.75rem; font-weight:700; padding:4px 8px; border-radius:4px; outline:none;">
+                  <option value="GET">GET</option>
+                  <option value="POST">POST</option>
+                  <option value="PUT">PUT</option>
+                  <option value="DELETE">DELETE</option>
+                </select>
+                <input type="text" id="manualHttpUrl" placeholder="Enter website or API URL to test (e.g. https://httpbin.org/get)..." style="flex:1; background:#080b11; border:1px solid #283347; color:#fff; font-size:0.78rem; padding:4px 8px; border-radius:4px; outline:none; font-family:monospace;" onkeydown="if(event.key==='Enter') executeManualHttpTest();" />
+                <button class="btn-pill" style="padding:4px 10px; font-size:0.74rem; background:#0284c7;" onclick="executeManualHttpTest()">Inspect URL ⚡</button>
+              </div>
+              <div style="display:flex; flex:1; min-height:0;">
+                <!-- Box 1: HTTP Request Inspector -->
+                <div style="flex:1; border-right:1px solid var(--border-color); display:flex; flex-direction:column; overflow:hidden;">
+                  <div style="padding:6px 12px; background:#121824; font-size:0.75rem; font-weight:600; color:var(--accent-amber); display:flex; justify-content:space-between; border-bottom:1px solid #1e2636;">
+                    <span>📤 HTTP REQUEST</span>
+                    <button class="btn-icon" style="padding:1px 6px; font-size:0.7rem;" onclick="copyText('matrixReqBox')">Copy</button>
+                  </div>
+                  <pre id="matrixReqBox" style="flex:1; margin:0; padding:10px; font-family:'Cascadia Code',Consolas,monospace; font-size:0.8rem; color:#cbd5e1; background:#080b11; overflow:auto; white-space:pre-wrap; line-height:1.4;">GET https://httpbin.org/get
+User-Agent: MatrixAgent/2.0
+Accept: application/json</pre>
+                </div>
+                <!-- Box 2: HTTP Response Inspector -->
+                <div style="flex:1; display:flex; flex-direction:column; overflow:hidden;">
+                  <div style="padding:6px 12px; background:#121824; font-size:0.75rem; font-weight:600; color:var(--accent-green); display:flex; justify-content:space-between; border-bottom:1px solid #1e2636;">
+                    <span>📥 HTTP RESPONSE</span>
+                    <button class="btn-icon" style="padding:1px 6px; font-size:0.7rem;" onclick="copyText('matrixResBox')">Copy</button>
+                  </div>
+                  <pre id="matrixResBox" style="flex:1; margin:0; padding:10px; font-family:'Cascadia Code',Consolas,monospace; font-size:0.8rem; color:#86efac; background:#080b11; overflow:auto; white-space:pre-wrap; line-height:1.4;">Status: 200 OK
+Content-Type: application/json
+
+{
+  "origin": "127.0.0.1",
+  "url": "https://httpbin.org/get"
+}</pre>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TERMINAL TAB -->
+      <div id="tab-terminal" class="tab-content">
+        <div id="terminal-container"></div>
+      </div>
+
+      <!-- EDITOR TAB -->
+      <div id="tab-editor" class="tab-content">
+        <div id="editor-container">
+          <div class="editor-toolbar">
+            <span id="currentFilePath" style="font-weight: 600;">No file selected</span>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-pill btn-secondary" onclick="reloadCurrentFile()">Revert / Reload</button>
+              <button class="btn-pill" onclick="saveActiveFile()">Save File (Ctrl+S)</button>
+            </div>
+          </div>
+          <textarea id="code-editor" oninput="updateEditorStats()"></textarea>
+          <div class="editor-status-bar">
+            <span id="editorStats">0 lines, 0 characters</span>
+            <span id="editorUnsavedBadge" style="color: var(--accent-amber); display: none;">● Unsaved Changes</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const socket = io();
+    let currentPath = "";
+    let isTaskRunning = false;
+    let currentStreamingCard = null;
+    let userHasScrolledUp = false;
+    let cachedFilesList = [];
+    let isFileDirty = false;
+
+    const leftSidebar = document.getElementById("leftSidebar");
+    const sidebarFloatingExpandBtn = document.getElementById("sidebarFloatingExpandBtn");
+    const chatContainer = document.getElementById("chatScrollContainer");
+    const scrollBottomBtn = document.getElementById("scrollBottomBtn");
+    const autoScrollCheck = document.getElementById("autoScrollCheck");
+    const connectionStatusDot = document.getElementById("connectionStatusDot");
+    const codeEditor = document.getElementById("code-editor");
+
+    // Sidebar Toggle Functionality (Left Box Hide / Show)
+    function toggleSidebar(forceState) {
+      const isCollapsed = leftSidebar.classList.contains("collapsed");
+      const shouldCollapse = forceState !== undefined ? !forceState : !isCollapsed;
+      
+      if (shouldCollapse) {
+        leftSidebar.classList.add("collapsed");
+        sidebarFloatingExpandBtn.style.display = "flex";
+        localStorage.setItem("opencode_sidebar_collapsed", "true");
+      } else {
+        leftSidebar.classList.remove("collapsed");
+        sidebarFloatingExpandBtn.style.display = "none";
+        localStorage.setItem("opencode_sidebar_collapsed", "false");
+      }
+      setTimeout(() => {
+        if (typeof syncTerminalSize === "function") syncTerminalSize();
+      }, 260);
+    }
+
+    // Restore sidebar state from localStorage
+    if (localStorage.getItem("opencode_sidebar_collapsed") === "true") {
+      toggleSidebar(false);
+    }
+
+    // Keyboard Shortcuts (Ctrl+B to toggle left box, Ctrl+S to save file, Escape to close modal)
+    window.addEventListener("keydown", (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "b") {
+        e.preventDefault();
+        toggleSidebar();
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "s") {
+        e.preventDefault();
+        saveActiveFile();
+      }
+      if (e.key === "Escape") {
+        closeSettingsModal();
+      }
+    });
+
+    // Auto-expand textarea
+    function autoExpandTextarea(el) {
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 140) + "px";
+    }
+
+    // Monitor chat scroll position
+    chatContainer.addEventListener("scroll", () => {
+      const threshold = 100;
+      const isAtBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight <= threshold;
+      if (!isAtBottom) {
+        userHasScrolledUp = true;
+        scrollBottomBtn.style.display = "block";
+      } else {
+        userHasScrolledUp = false;
+        scrollBottomBtn.style.display = "none";
+      }
+    });
+
+    function scrollToBottom(force = false) {
+      if (force || (!userHasScrolledUp && autoScrollCheck.checked)) {
+        requestAnimationFrame(() => {
+          chatContainer.scrollTop = chatContainer.scrollHeight;
+        });
+      }
+    }
+
+    function toggleThought(headerEl) {
+      const body = headerEl.nextElementSibling;
+      const icon = headerEl.querySelector("span:last-child");
+      if (!body) return;
+      const isHidden = window.getComputedStyle(body).display === "none";
+      if (isHidden) {
+        body.style.display = "block";
+        if (icon) icon.textContent = "▾";
+      } else {
+        body.style.display = "none";
+        if (icon) icon.textContent = "▸";
+      }
+    }
+
+    function handleInputKey(e) {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        if (isTaskRunning) {
+          sendSteeringGuidance();
+        } else {
+          sendAgentAction();
+        }
+      }
+    }
+
+    function setPrompt(text) {
+      const inp = document.getElementById("agentGoalInput");
+      inp.value = text;
+      autoExpandTextarea(inp);
+      inp.focus();
+    }
+
+    function setAgentState(state, text) {
+      const tag = document.getElementById("agentStatusTag");
+      tag.className = "agent-status-tag " + state;
+      tag.textContent = text;
+      const btnSend = document.getElementById("btnSend");
+      const btnSteer = document.getElementById("btnSteer");
+      const btnStop = document.getElementById("btnStop");
+      const inp = document.getElementById("agentGoalInput");
+
+      if (state === "running" || state === "thinking" || state === "executing") {
+        isTaskRunning = true;
+        btnSend.style.display = "none";
+        btnSteer.style.display = "flex";
+        btnStop.style.display = "block";
+        inp.placeholder = "Agent is executing. Type live guidance to steer the agent and press Enter...";
+      } else {
+        isTaskRunning = false;
+        btnSend.style.display = "flex";
+        btnSteer.style.display = "none";
+        btnStop.style.display = "none";
+        inp.placeholder = "Type task goal (Enter to run, Shift+Enter for newline)...";
+      }
+    }
+
+    function sendAgentAction() {
+      const input = document.getElementById("agentGoalInput");
+      const goal = input.value.trim();
+      if (!goal) return;
+      input.value = "";
+      autoExpandTextarea(input);
+
+      const userCard = document.createElement("div");
+      userCard.className = "msg-card";
+      userCard.innerHTML = `<div class="msg-user"><strong>Goal:</strong> ${escapeHtml(goal)}</div>`;
+      chatContainer.appendChild(userCard);
+      scrollToBottom(true);
+
+      setAgentState("thinking", "● Initializing Step 1...");
+      socket.emit("start_agent_task", { goal });
+    }
+
+    function sendSteeringGuidance() {
+      const input = document.getElementById("agentGoalInput");
+      const text = input.value.trim();
+      if (!text) return;
+      input.value = "";
+      autoExpandTextarea(input);
+
+      const steerCard = document.createElement("div");
+      steerCard.className = "msg-card";
+      steerCard.innerHTML = `<div class="msg-user-steer"><span>🧭 <strong>Live Steering Guidance Injected:</strong> ${escapeHtml(text)}</span></div>`;
+      chatContainer.appendChild(steerCard);
+      scrollToBottom(true);
+
+      socket.emit("agent_user_guidance", { guidance: text });
+    }
+
+    function stopAgentTask() {
+      socket.emit("cancel_agent_task");
+      setAgentState("idle", "● Halting...");
+    }
+
+    function clearChat() {
+      chatContainer.innerHTML = "";
+      const welcome = document.createElement("div");
+      welcome.className = "msg-card msg-thought";
+      welcome.innerHTML = `
+        <div class="thought-header" onclick="toggleThought(this)">
+          <span>✨ Timeline Reset</span>
+          <span>▾</span>
+        </div>
+        <div class="thought-body">Ready for new tasks. Type your objective below. Toggle left Explorer box with Ctrl+B.</div>
+      `;
+      chatContainer.appendChild(welcome);
+    }
+
+    function exportChatTranscript() {
+      const messages = chatContainer.innerText;
+      const blob = new Blob([messages], { type: "text/plain;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `opencode_session_${Date.now()}.txt`;
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function escapeHtml(str) {
+      if (!str) return "";
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+    }
+
+    function copyCodeText(btn) {
+      const codeBox = btn.closest(".code-block-box");
+      if (!codeBox) return;
+      const codeElem = codeBox.querySelector(".code-block-body code") || codeBox.querySelector(".code-block-body");
+      const text = codeElem ? codeElem.innerText : "";
+      navigator.clipboard.writeText(text).then(() => {
+        const original = btn.textContent;
+        btn.textContent = "Copied! ✓";
+        setTimeout(() => { btn.textContent = original; }, 1800);
+      }).catch(() => {
+        btn.textContent = "Failed";
+      });
+    }
+
+    function renderMarkdownToHtml(markdownText) {
+      if (!markdownText) return "";
+      
+      if (window.marked && typeof window.marked.parse === "function") {
+        const renderer = new marked.Renderer();
+        renderer.code = function(codeData, lang) {
+          const code = typeof codeData === 'object' ? (codeData.text || '') : codeData;
+          const language = (typeof codeData === 'object' ? codeData.lang : lang) || 'code';
+          return `
+            <div class="code-block-box">
+              <div class="code-block-header">
+                <span class="code-block-lang">${escapeHtml(language)}</span>
+                <button class="code-copy-btn" onclick="copyCodeText(this)">Copy</button>
+              </div>
+              <pre class="code-block-body"><code>${escapeHtml(code)}</code></pre>
+            </div>
+          `;
+        };
+        renderer.codespan = function(codeSpan) {
+          const text = typeof codeSpan === 'object' ? (codeSpan.text || '') : codeSpan;
+          return `<code class="inline-code">${escapeHtml(text)}</code>`;
+        };
+        return marked.parse(markdownText, { renderer, breaks: true, gfm: true });
+      }
+
+      let out = escapeHtml(markdownText);
+      out = out.replace(/```([a-zA-Z0-9_-]*)\r?\n([\s\S]*?)```/g, (match, lang, code) => {
+        return `
+          <div class="code-block-box">
+            <div class="code-block-header">
+              <span class="code-block-lang">${lang || 'code'}</span>
+              <button class="code-copy-btn" onclick="copyCodeText(this)">Copy</button>
+            </div>
+            <pre class="code-block-body"><code>${code.trim()}</code></pre>
+          </div>
+        `;
+      });
+      out = out.replace(/`([^`]+)`/g, '<code class="inline-code">$1</code>');
+      out = out.replace(/\*\*([^\*]+)\*\*/g, '<strong>$1</strong>');
+      out = out.replace(/^[-*]\s+(.*)$/gm, '<li>$1</li>');
+      out = out.replace(/(<li>.*<\/li>)/gs, '<ul>$1</ul>');
+      out = out.replace(/\n/g, '<br/>');
+      return out;
+    }
+
+    // Socket.io Agent Timeline Listeners
+    socket.on("connect", () => {
+      connectionStatusDot.className = "connection-dot connected";
+      connectionStatusDot.title = "Connected to Server";
+      socket.emit("terminal_init", { cols: term.cols, rows: term.rows });
+      setTimeout(syncTerminalSize, 250);
+    });
+
+    socket.on("disconnect", () => {
+      connectionStatusDot.className = "connection-dot";
+      connectionStatusDot.title = "Disconnected from Server";
+    });
+
+    socket.on("agent_status", (data) => {
+      const matBadge = document.getElementById("matrixAgentBadge");
+      if (matBadge) {
+        matBadge.textContent = data.message || data.status;
+      }
+      if (data.status === "thinking") {
+        setAgentState("thinking", `● Step ${data.step || 1} Reasoning`);
+      } else if (data.status === "running") {
+        setAgentState("running", "● Executing Loop");
+      } else if (data.status === "completed" || data.status === "finished") {
+        setAgentState("idle", "● Completed");
+      } else if (data.status === "cancelled" || data.status === "stopped") {
+        setAgentState("idle", "● Stopped");
+      }
+      if (data.message) {
+        document.getElementById("agentStepIndicator").textContent = data.message;
+      }
+    });
+
+    socket.on("agent_stream_token", (data) => {
+      if (!currentStreamingCard || currentStreamingCard.dataset.step != data.step) {
+        const card = document.createElement("div");
+        card.className = "msg-card msg-thought";
+        card.dataset.step = data.step;
+        card.innerHTML = `
+          <div class="thought-header" onclick="toggleThought(this)">
+            <span>🧠 Step ${data.step} Reasoning & Plan</span>
+            <span>▾</span>
+          </div>
+          <div class="thought-body"></div>
+        `;
+        chatContainer.appendChild(card);
+        currentStreamingCard = card;
+      }
+      const body = currentStreamingCard.querySelector(".thought-body");
+      body.textContent += data.chunk;
+      scrollToBottom();
+
+      // Stream synchronously into Matrix Agent chat window as well
+      const mChat = document.getElementById("matrixChatScroll");
+      if (mChat) {
+        let mStreamCard = document.getElementById(`matrix-step-${data.step}`);
+        if (!mStreamCard) {
+          mStreamCard = document.createElement("div");
+          mStreamCard.id = `matrix-step-${data.step}`;
+          mStreamCard.className = "msg-card msg-thought";
+          mStreamCard.innerHTML = `<div class="thought-header"><span>🧠 Step ${data.step} Live Reasoning</span></div><div class="thought-body" style="font-size:0.84rem;"></div>`;
+          mChat.appendChild(mStreamCard);
+        }
+        const mBody = mStreamCard.querySelector(".thought-body");
+        if (mBody) {
+          mBody.textContent += data.chunk;
+          mChat.scrollTop = mChat.scrollHeight;
+        }
+      }
+    });
+
+    socket.on("agent_action_stream", (data) => {
+      const targetId = `result-${data.step}-${data.action_num}`;
+      const elem = document.getElementById(targetId);
+      if (elem) {
+        if (elem.textContent === "Executing action on host system...") {
+          elem.textContent = "";
+        }
+        elem.textContent += data.chunk;
+        scrollToBottom();
+      }
+    });
+
+    socket.on("agent_thought_complete", (data) => {
+      const fullHtml = renderMarkdownToHtml(data.full_text || "(Action generated for this step)");
+      // Mirror to Matrix view
+      const matrixScroll = document.getElementById("matrixChatScroll");
+      if (matrixScroll && data.full_text) {
+        const mCard = document.createElement("div");
+        mCard.className = "msg-card msg-thought";
+        mCard.innerHTML = `<div class="thought-header"><span>🧠 Step ${data.step} Plan</span></div><div class="thought-body markdown-content">${fullHtml}</div>`;
+        matrixScroll.appendChild(mCard);
+        matrixScroll.scrollTop = matrixScroll.scrollHeight;
+      }
+      if (currentStreamingCard) {
+        const body = currentStreamingCard.querySelector(".thought-body");
+        if (body) {
+          body.className = "thought-body markdown-content";
+          body.innerHTML = fullHtml;
+        }
+      } else if (data.full_text) {
+        const card = document.createElement("div");
+        card.className = "msg-card msg-thought";
+        card.dataset.step = data.step;
+        card.innerHTML = `
+          <div class="thought-header" onclick="toggleThought(this)">
+            <span>🧠 Step ${data.step} Reasoning & Plan</span>
+            <span>▾</span>
+          </div>
+          <div class="thought-body markdown-content">${fullHtml}</div>
+        `;
+        chatContainer.appendChild(card);
+      }
+      currentStreamingCard = null;
+      scrollToBottom();
+    });
+
+    socket.on("agent_final_response", (data) => {
+      const rawContent = (data.content && data.content.trim()) ? data.content : "Task completed successfully.";
+      const formattedHtml = renderMarkdownToHtml(rawContent);
+
+      const card = document.createElement("div");
+      card.className = "msg-card msg-thought";
+      card.style.borderLeft = "4px solid var(--accent-green)";
+      card.innerHTML = `
+        <div class="thought-header" onclick="toggleThought(this)" style="color: var(--accent-green);">
+          <span>🎯 Agent Response</span>
+          <span>▾</span>
+        </div>
+        <div class="thought-body markdown-content" style="display: block; font-size: 0.92rem; color: #f8fafc;">${formattedHtml}</div>
+      `;
+      chatContainer.appendChild(card);
+      scrollToBottom(true);
+
+      const mChat = document.getElementById("matrixChatScroll");
+      if (mChat) {
+        const mCard = document.createElement("div");
+        mCard.className = "msg-card msg-thought";
+        mCard.style.borderLeft = "4px solid var(--accent-green)";
+        mCard.innerHTML = `
+          <div class="thought-header" style="color: var(--accent-green);">
+            <span>⚡ Matrix Response</span>
+          </div>
+          <div class="thought-body markdown-content" style="display: block; font-size: 0.9rem; color: #f8fafc;">${formattedHtml}</div>
+        `;
+        mChat.appendChild(mCard);
+        mChat.scrollTop = mChat.scrollHeight;
+      }
+    });
+
+    socket.on("agent_steer_injected", (data) => {
+      const card = document.createElement("div");
+      card.className = "msg-card";
+      card.innerHTML = `<div class="msg-user-steer"><span>⚡ Injected into agent context: ${escapeHtml(data.guidance)}</span></div>`;
+      chatContainer.appendChild(card);
+      scrollToBottom();
+    });
+
+    socket.on("agent_action_approval_request", (data) => {
+      setAgentState("executing", `● Awaiting Your Approval [${data.action}]`);
+      const card = document.createElement("div");
+      card.className = "msg-card msg-tool";
+      card.id = `approval-card-${data.approval_id}`;
+      card.style.border = "1px solid var(--accent-amber)";
+      card.innerHTML = `
+        <div class="tool-header" style="color: var(--accent-amber); background: rgba(245, 158, 11, 0.1);">
+          <span>⚠️ Action Approval Required: ${escapeHtml(data.action)} ${data.target ? '→ ' + escapeHtml(data.target) : ''}</span>
+          <span>[Pending User Confirmation]</span>
+        </div>
+        <div class="tool-body">${escapeHtml(data.payload || data.target || '')}</div>
+        <div style="padding: 10px 14px; background: var(--bg-dark); display: flex; justify-content: flex-end; gap: 10px; border-top: 1px solid var(--border-color);">
+          <button class="btn-pill" style="background: var(--accent-red);" onclick="resolveActionApproval('${data.approval_id}', false)">✕ Reject / Cancel</button>
+          <button class="btn-pill" style="background: var(--accent-green);" onclick="resolveActionApproval('${data.approval_id}', true)">✓ Approve & Run Process</button>
+        </div>
+      `;
+      chatContainer.appendChild(card);
+      scrollToBottom(true);
+    });
+
+    function resolveActionApproval(approvalId, approved) {
+      socket.emit("agent_action_decision", { approval_id: approvalId, approved: approved });
+      const card = document.getElementById(`approval-card-${approvalId}`);
+      if (card) {
+        const footer = card.querySelector("div:last-child");
+        if (footer) {
+          footer.innerHTML = approved 
+            ? `<span style="color: var(--accent-green); font-size: 0.82rem; font-weight:600;">✓ Approved by user - Executing now...</span>`
+            : `<span style="color: var(--accent-red); font-size: 0.82rem; font-weight:600;">✕ Rejected by user</span>`;
+        }
+      }
+    }
+
+    socket.on("agent_action", (data) => {
+      setAgentState("executing", `● Tool [${data.action}]`);
+      const card = document.createElement("div");
+      card.className = "msg-card msg-tool";
+      card.id = `action-card-${data.step}-${data.action_num}`;
+      card.innerHTML = `
+        <div class="tool-header">
+          <span>⚡ Action: ${escapeHtml(data.action)} ${data.target ? '→ ' + escapeHtml(data.target) : ''}</span>
+          <span>[Running...]</span>
+        </div>
+        <div class="tool-body">${escapeHtml(data.payload)}</div>
+        <div class="tool-result" id="result-${data.step}-${data.action_num}">Executing action on host system...</div>
+      `;
+      chatContainer.appendChild(card);
+      scrollToBottom();
+
+      const mChat = document.getElementById("matrixChatScroll");
+      if (mChat) {
+        const mAction = document.createElement("div");
+        mAction.className = "msg-card msg-tool";
+        mAction.id = `m-action-${data.step}-${data.action_num}`;
+        mAction.innerHTML = `
+          <div class="tool-header">
+            <span>⚡ Command: ${escapeHtml(data.action)}</span>
+            <span>[Active]</span>
+          </div>
+          <div class="tool-body" style="font-size:0.8rem;">${escapeHtml(data.payload)}</div>
+          <div class="tool-result" id="m-res-${data.step}-${data.action_num}" style="font-size:0.8rem;">Running...</div>
+        `;
+        mChat.appendChild(mAction);
+        mChat.scrollTop = mChat.scrollHeight;
+      }
+    });
+
+    socket.on("agent_action_result", (data) => {
+      let resElem = null;
+      if (data.step && data.action_num) {
+        resElem = document.getElementById(`result-${data.step}-${data.action_num}`);
+      }
+      if (!resElem) {
+        const results = document.querySelectorAll(".tool-result");
+        resElem = results.length > 0 ? results[results.length - 1] : null;
+      }
+      if (resElem) {
+        const header = resElem.parentElement.querySelector(".tool-header span:last-child");
+        if (data.status === 0) {
+          resElem.className = "tool-result success";
+          if (header) header.textContent = "[Success]";
+        } else {
+          resElem.className = "tool-result error";
+          if (header) header.textContent = `[Exit Code ${data.status}]`;
+        }
+        resElem.textContent = data.output || "(No output)";
+      }
+
+      const mRes = document.getElementById(`m-res-${data.step}-${data.action_num}`);
+      if (mRes) {
+        mRes.className = data.status === 0 ? "tool-result success" : "tool-result error";
+        mRes.textContent = data.output || "(No output)";
+        const mChat = document.getElementById("matrixChatScroll");
+        if (mChat) mChat.scrollTop = mChat.scrollHeight;
+      }
+
+      scrollToBottom();
+      if (data.action && data.action.startsWith("file_")) {
+        loadFiles();
+      }
+    });
+
+    // Terminal setup
+    const term = new Terminal({
+      cursorBlink: true,
+      convertEol: true,
+      scrollback: 10000,
+      tabStopWidth: 4,
+      theme: {
+        background: "#07090e",
+        foreground: "#e2e8f0",
+        cursor: "#38bdf8"
+      },
+      fontFamily: "Consolas, 'Cascadia Code', monospace",
+      fontSize: 14
+    });
+
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(document.getElementById("terminal-container"));
+
+    function syncTerminalSize() {
+      try {
+        fitAddon.fit();
+        socket.emit("terminal_resize", { cols: term.cols, rows: term.rows });
+      } catch (err) {}
+    }
+
+    window.addEventListener("resize", () => {
+      syncTerminalSize();
+      fitActiveMatrixTerm();
+    });
+
+    const matrixTermObserver = new ResizeObserver(() => {
+      fitActiveMatrixTerm();
+    });
+    const matrixTermWrapper = document.getElementById("matrixTerminalContainer");
+    if (matrixTermWrapper) {
+      matrixTermObserver.observe(matrixTermWrapper);
+    }
+    term.onData((data) => socket.emit("terminal_input", { input: data }));
+    socket.on("terminal_output", (msg) => term.write(msg.data));
+
+    function switchTab(name) {
+      document.querySelectorAll(".tab").forEach((t, i) => {
+        t.classList.toggle("active", ["agent", "matrix", "terminal", "editor"][i] === name);
+      });
+      document.querySelectorAll(".tab-content").forEach(tc => tc.classList.remove("active"));
+      const targetTab = document.getElementById("tab-" + name);
+      if (targetTab) targetTab.classList.add("active");
+      if (name === "terminal") {
+        setTimeout(syncTerminalSize, 80);
+      } else if (name === "matrix") {
+        setTimeout(() => {
+          fitActiveMatrixTerm();
+          if (activeMatrixTermId && matrixTerminals[activeMatrixTermId]) {
+            matrixTerminals[activeMatrixTermId].term.focus();
+          }
+        }, 80);
+      } else if (name === "agent") {
+        scrollToBottom();
+      }
+    }
+
+    // File Explorer & Filtering
+    async function loadFiles() {
+      try {
+        const res = await fetch("/api/files");
+        const data = await res.json();
+        cachedFilesList = data.files || [];
+        renderFilesList(cachedFilesList);
+      } catch (e) {
+        console.error("Error loading files:", e);
+      }
+    }
+
+    function renderFilesList(files) {
+      const tree = document.getElementById("fileTree");
+      tree.innerHTML = "";
+      files.forEach(f => {
+        const li = document.createElement("li");
+        li.className = "file-item" + (currentPath === f.path ? " active-file" : "");
+        
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "file-item-name";
+        nameSpan.innerHTML = (f.is_dir ? "📁 " : "📄 ") + escapeHtml(f.name);
+        li.appendChild(nameSpan);
+
+        if (!f.is_dir) {
+          const delBtn = document.createElement("span");
+          delBtn.className = "file-delete-icon";
+          delBtn.title = "Delete file";
+          delBtn.textContent = "🗑";
+          delBtn.onclick = (e) => {
+            e.stopPropagation();
+            deleteFilePrompt(f.path);
+          };
+          li.appendChild(delBtn);
+          li.onclick = () => openFile(f.path);
+        }
+        tree.appendChild(li);
+      });
+    }
+
+    function filterFiles() {
+      const query = document.getElementById("fileFilterInput").value.toLowerCase().trim();
+      if (!query) {
+        renderFilesList(cachedFilesList);
+        return;
+      }
+      const filtered = cachedFilesList.filter(f => f.name.toLowerCase().includes(query) || f.path.toLowerCase().includes(query));
+      renderFilesList(filtered);
+    }
+
+    async function openFile(path) {
+      const res = await fetch("/api/file/read?path=" + encodeURIComponent(path));
+      const data = await res.json();
+      if (data.content !== undefined) {
+        currentPath = path;
+        document.getElementById("currentFilePath").textContent = path;
+        codeEditor.value = data.content;
+        isFileDirty = false;
+        document.getElementById("editorUnsavedBadge").style.display = "none";
+        updateEditorStats();
+        renderFilesList(cachedFilesList);
+        switchTab("editor");
+      }
+    }
+
+    async function reloadCurrentFile() {
+      if (currentPath) {
+        await openFile(currentPath);
+      }
+    }
+
+    function updateEditorStats() {
+      const content = codeEditor.value;
+      const lines = content.split("\n").length;
+      const chars = content.length;
+      document.getElementById("editorStats").textContent = `${lines} lines, ${chars} characters`;
+      document.getElementById("editorUnsavedBadge").style.display = "inline";
+      isFileDirty = true;
+    }
+
+    async function saveActiveFile() {
+      if (!currentPath) {
+        const newName = prompt("Enter path to save new file:");
+        if (!newName) return;
+        currentPath = newName.trim();
+      }
+      const content = codeEditor.value;
+      const res = await fetch("/api/file/save", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: currentPath, content })
+      });
+      const data = await res.json();
+      if (data.status === "ok") {
+        isFileDirty = false;
+        document.getElementById("editorUnsavedBadge").style.display = "none";
+        document.getElementById("currentFilePath").textContent = currentPath + " (Saved ✓)";
+        loadFiles();
+      } else {
+        alert("Error saving: " + (data.error || "Unknown error"));
+      }
+    }
+
+    async function createNewFilePrompt() {
+      const name = prompt("Enter new filename (e.g. script.py, notes.txt):");
+      if (!name) return;
+      const res = await fetch("/api/file/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path: name.trim() })
+      });
+      const data = await res.json();
+      if (data.status === "ok") {
+        await loadFiles();
+        openFile(name.trim());
+      } else {
+        alert("Error creating file: " + (data.error || "Failed"));
+      }
+    }
+
+    async function deleteFilePrompt(path) {
+      if (!confirm(`Are you sure you want to delete ${path}?`)) return;
+      const res = await fetch("/api/file/delete", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ path })
+      });
+      const data = await res.json();
+      if (data.status === "ok") {
+        if (currentPath === path) {
+          currentPath = "";
+          codeEditor.value = "";
+          document.getElementById("currentFilePath").textContent = "No file selected";
+        }
+        loadFiles();
+      } else {
+        alert("Error deleting: " + (data.error || "Failed"));
+      }
+    }
+
+    function openSettingsModal() {
+      const modal = document.getElementById("settingsModal");
+      if (modal) {
+        fetch("/api/config")
+          .then(r => r.json())
+          .then(cfg => {
+            if (cfg) {
+              const sysInst = document.getElementById("settingsSystemInstruction");
+              const autoAppr = document.getElementById("settingsAutoApprove");
+              const maxIter = document.getElementById("settingsMaxIterations");
+              if (sysInst && cfg.system_instruction !== undefined) sysInst.value = cfg.system_instruction;
+              if (autoAppr && cfg.auto_approve !== undefined) autoAppr.checked = Boolean(cfg.auto_approve);
+              if (maxIter && cfg.max_iterations !== undefined) maxIter.value = cfg.max_iterations;
+            }
+          })
+          .catch(() => {});
+        modal.style.display = "flex";
+      }
+    }
+
+    function closeSettingsModal() {
+      const modal = document.getElementById("settingsModal");
+      if (modal) modal.style.display = "none";
+    }
+
+    async function saveSettings() {
+      const sysInst = document.getElementById("settingsSystemInstruction")?.value || "";
+      const autoAppr = document.getElementById("settingsAutoApprove")?.checked ?? true;
+      const maxIter = parseInt(document.getElementById("settingsMaxIterations")?.value || "50", 10);
+
+      try {
+        const res = await fetch("/api/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            system_instruction: sysInst,
+            auto_approve: autoAppr,
+            max_iterations: maxIter
+          })
+        });
+        const data = await res.json();
+        if (data.status === "ok") {
+          closeSettingsModal();
+          alert("Settings successfully saved and applied to the agent!");
+        } else {
+          alert("Error saving settings: " + (data.error || "Unknown error"));
+        }
+      } catch (err) {
+        alert("Failed to save settings: " + err.message);
+      }
+    }
+
+    async function updateConfig() {
+      const url = document.getElementById("ngrokUrlInput").value;
+      await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ngrok_url: url })
+      });
+      alert("Endpoint configuration updated!");
+    }
+
+    async function testConnection() {
+      const url = document.getElementById("ngrokUrlInput").value.trim().replace(/\/+$/, "");
+      if (!url) {
+        alert("Please specify an endpoint URL first.");
+        return;
+      }
+      const target = url + "/health";
+      try {
+        const start = Date.now();
+        const res = await fetch(target, { mode: "cors" }).catch(() => null);
+        const diff = Date.now() - start;
+        if (res && res.ok) {
+          const data = await res.json();
+          alert(`Connected! Latency: ${diff}ms\nModel: ${data.model || 'Ready'}`);
+        } else {
+          alert(`Ping sent to ${target}. Check if ngrok tunnel is running.`);
+        }
+      } catch (e) {
+        alert(`Health check notice: ${e.message}`);
+      }
+    }
+
+    async function checkBrowserBridgeStatus() {
+      try {
+        const res = await fetch("/api/browser/status");
+        const data = await res.json();
+        const badge = document.getElementById("browserBridgeBadge");
+        const text = document.getElementById("browserBridgeText");
+        if (data && data.connected) {
+          badge.style.background = "rgba(34, 197, 94, 0.15)";
+          badge.style.color = "var(--accent-green)";
+          badge.style.borderColor = "rgba(34, 197, 94, 0.3)";
+          const title = data.activeTab ? (data.activeTab.title || 'Tab active').slice(0, 24) : 'Ready';
+          text.textContent = `MCP: ${title}`;
+          badge.title = `Connected: ${data.details || 'Active'}`;
+        } else {
+          badge.style.background = "rgba(239, 68, 68, 0.15)";
+          badge.style.color = "var(--accent-red)";
+          badge.style.borderColor = "rgba(239, 68, 68, 0.3)";
+          text.textContent = "MCP: Disconnected";
+          badge.title = "Disconnected. Open chrome://extensions -> Load unpacked -> 'mcp_extension'";
+        }
+      } catch (err) {}
+    }
+    setInterval(checkBrowserBridgeStatus, 3000);
+    checkBrowserBridgeStatus();
+
+    // Matrix Agent Multi-Terminal & Inspector Logic
+    const matrixTerminals = {};
+    let activeMatrixTermId = null;
+
+    function spawnNewMatrixTerm() {
+      const id = 'term_' + Date.now().toString(36) + Math.random().toString(36).substr(2, 4);
+      const name = 'cmd-' + (Object.keys(matrixTerminals).length + 1);
+      const termObj = new Terminal({
+        cursorBlink: true,
+        convertEol: true,
+        scrollback: 5000,
+        theme: {
+          background: '#0a0a0a',
+          foreground: '#39ff14',
+          cursor: '#39ff14'
+        },
+        fontFamily: "Consolas, 'Cascadia Code', monospace",
+        fontSize: 13,
+        allowTransparency: true
+      });
+      const fit = new FitAddon.FitAddon();
+      termObj.loadAddon(fit);
+      const termContainer = document.createElement("div");
+      termContainer.style.width = "100%";
+      termContainer.style.height = "100%";
+      termObj.open(termContainer);
+
+      matrixTerminals[id] = { term: termObj, fit: fit, name: name, container: termContainer };
+
+      socket.emit("matrix_term_create", { term_id: id, name: name });
+      termObj.onData(data => socket.emit("matrix_term_input", { term_id: id, input: data }));
+      renderMatrixTermTabs();
+      switchMatrixTerm(id);
+      setTimeout(() => fitActiveMatrixTerm(), 100);
+    }
+
+    function renderMatrixTermTabs() {
+      const container = document.getElementById("matrixTermTabs");
+      if (!container) return;
+      container.innerHTML = "";
+      Object.keys(matrixTerminals).forEach(tid => {
+        const m = matrixTerminals[tid];
+        const btn = document.createElement("div");
+        btn.className = "prompt-chip" + (tid === activeMatrixTermId ? " active-term" : "");
+        btn.style.borderColor = tid === activeMatrixTermId ? 'var(--accent-green)' : 'var(--border-color)';
+        btn.style.color = tid === activeMatrixTermId ? '#4ade80' : 'var(--text-muted)';
+        btn.style.cursor = 'pointer';
+        btn.textContent = `> ${m.name}`;
+        btn.onclick = () => switchMatrixTerm(tid);
+        container.appendChild(btn);
+      });
+    }
+
+    function switchMatrixTerm(tid) {
+      activeMatrixTermId = tid;
+      const mount = document.getElementById("matrixTerminalContainer");
+      if (!mount) return;
+      mount.innerHTML = "";
+      if (matrixTerminals[tid] && matrixTerminals[tid].container) {
+        mount.appendChild(matrixTerminals[tid].container);
+        setTimeout(fitActiveMatrixTerm, 50);
+      }
+      renderMatrixTermTabs();
+    }
+
+    function fitActiveMatrixTerm() {
+      if (activeMatrixTermId && matrixTerminals[activeMatrixTermId]) {
+        try {
+          const m = matrixTerminals[activeMatrixTermId];
+          m.fit.fit();
+          socket.emit("matrix_term_resize", { term_id: activeMatrixTermId, cols: m.term.cols, rows: m.term.rows });
+        } catch(e) {}
+      }
+    }
+
+    function closeActiveMatrixTerm() {
+      if (!activeMatrixTermId) return;
+      const tid = activeMatrixTermId;
+      socket.emit("matrix_term_close", { term_id: tid });
+      delete matrixTerminals[tid];
+      const keys = Object.keys(matrixTerminals);
+      if (keys.length > 0) {
+        switchMatrixTerm(keys[0]);
+      } else {
+        document.getElementById("matrixTerminalContainer").innerHTML = "<div style='color:#64748b; padding:20px; font-family:monospace;'>No active CMD consoles. Click '+ New Terminal (CMD)' to launch.</div>";
+        activeMatrixTermId = null;
+        renderMatrixTermTabs();
+      }
+    }
+
+    socket.on("matrix_term_output", data => {
+      if (matrixTerminals[data.term_id]) {
+        matrixTerminals[data.term_id].term.write(data.data);
+      }
+    });
+
+    socket.on("matrix_http_event", data => {
+      if (data.raw_request) document.getElementById("matrixReqBox").textContent = data.raw_request;
+      if (data.output) {
+        let formatted = data.output;
+        try {
+          const parts = data.output.split("\n\n");
+          if (parts.length > 1 && parts[parts.length - 1].trim().startsWith("{")) {
+            const parsed = JSON.parse(parts[parts.length - 1]);
+            formatted = parts.slice(0, -1).join("\n\n") + "\n\n" + JSON.stringify(parsed, null, 2);
+          }
+        } catch(e) {}
+        document.getElementById("matrixResBox").textContent = formatted;
+      }
+      const statusBadge = document.getElementById("matrixInspectorStatus");
+      if (statusBadge) {
+        statusBadge.textContent = `HTTP ${data.status || 200} | Step ${data.step || 1} ${data.elapsed_ms ? '(' + data.elapsed_ms + 'ms)' : ''}`;
+      }
+    });
+
+    async function executeManualHttpTest() {
+      const method = document.getElementById("manualHttpMethod").value;
+      const url = document.getElementById("manualHttpUrl").value.trim();
+      if (!url) return;
+      document.getElementById("matrixInspectorStatus").textContent = `Sending ${method}...`;
+      try {
+        const res = await fetch("/api/http/test", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ method: method, url: url })
+        });
+        const data = await res.json();
+        if (data.error) {
+          document.getElementById("matrixInspectorStatus").textContent = `Error: ${data.error}`;
+        }
+      } catch (err) {
+        document.getElementById("matrixInspectorStatus").textContent = `Network Error: ${err.message}`;
+      }
+    }
+
+    function clearHttpInspector() {
+      document.getElementById("matrixReqBox").textContent = "";
+      document.getElementById("matrixResBox").textContent = "";
+      document.getElementById("matrixInspectorStatus").textContent = "Awaiting traffic";
+    }
+
+    function copyText(elemId) {
+      const text = document.getElementById(elemId)?.textContent || "";
+      navigator.clipboard.writeText(text);
+    }
+
+    function clearMatrixChat() {
+      document.getElementById("matrixChatScroll").innerHTML = "";
+    }
+
+    function sendMatrixAgentGoal() {
+      const input = document.getElementById("matrixGoalInput");
+      const goal = input.value.trim();
+      if (!goal) return;
+      input.value = "";
+
+      const chat = document.getElementById("matrixChatScroll");
+      const msg = document.createElement("div");
+      msg.className = "msg-card";
+      msg.innerHTML = `<div class="msg-user" style="background:linear-gradient(135deg, #15803d, #166534);"><strong>Matrix Goal:</strong> ${escapeHtml(goal)}</div>`;
+      chat.appendChild(msg);
+      chat.scrollTop = chat.scrollHeight;
+
+      if (Object.keys(matrixTerminals).length === 0) {
+        spawnNewMatrixTerm();
+      }
+
+      socket.emit("start_agent_task", { goal: goal });
+    }
+
+    // Spawn initial default Termux terminal
+    setTimeout(() => { spawnNewMatrixTerm(); }, 400);
+
+    loadFiles();
+  </script>
+</body>
+</html>
